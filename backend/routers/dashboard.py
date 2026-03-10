@@ -58,19 +58,22 @@ async def get_dashboard_summary(
     ) as cursor:
         metric_rows = await cursor.fetchall()
 
-    # Get the latest reading for each metric (most recent per metric)
+    # Get the latest reading for each metric, summed across all assets.
+    # Uses a window function to rank readings by time per asset+metric,
+    # then sums only the most recent reading from each asset.
     async with db.execute(
         """
-        SELECT metric_name, value as latest_value
-        FROM sensor_readings
-        WHERE facility_id = ?
-          AND id IN (
-              SELECT id FROM sensor_readings s2
-              WHERE s2.facility_id = sensor_readings.facility_id
-                AND s2.metric_name = sensor_readings.metric_name
-              ORDER BY s2.recorded_at DESC
-              LIMIT 1
-          )
+        SELECT metric_name, SUM(value) as latest_value
+        FROM (
+            SELECT metric_name, value,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY asset_id, metric_name
+                       ORDER BY recorded_at DESC
+                   ) as row_num
+            FROM sensor_readings
+            WHERE facility_id = ?
+        )
+        WHERE row_num = 1
         GROUP BY metric_name
         """,
         (facility_id,),
