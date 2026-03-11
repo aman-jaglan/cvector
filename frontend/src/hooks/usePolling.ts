@@ -3,7 +3,7 @@
  * and manages loading/error/data state.
  */
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { POLLING_INTERVAL_MS } from "../config";
 
 interface UsePollingResult<T> {
@@ -26,24 +26,24 @@ export function usePolling<T>(
   const fetchRef = useRef(fetchFn);
   fetchRef.current = fetchFn;
 
-  const execute = useCallback(async () => {
-    try {
-      const result = await fetchRef.current();
-      setData(result);
-      setError(null);
-      setLastUpdated(new Date());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
+    const execute = async () => {
+      try {
+        const result = await fetchRef.current();
+        setData(result);
+        setError(null);
+        setLastUpdated(new Date());
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Unknown error");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     execute();
     const timer = setInterval(execute, intervalMs);
     return () => clearInterval(timer);
-  }, [execute, intervalMs]);
+  }, [intervalMs]);
 
   return { data, loading, error, lastUpdated };
 }

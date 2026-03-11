@@ -3,7 +3,6 @@
  * chart-ready data grouped by asset name.
  */
 
-import { useCallback } from "react";
 import { fetchFacilityDetail, fetchSensorReadings } from "../api/client";
 import type { ChartDataPoint, MetricName } from "../types";
 import { usePolling } from "./usePolling";
@@ -17,7 +16,7 @@ export function useSensorData(
   facilityId: string | null,
   metricName: MetricName
 ) {
-  const fetchFn = useCallback(async (): Promise<SensorChartData | null> => {
+  const fetchFn = async (): Promise<SensorChartData | null> => {
     if (!facilityId) return null;
 
     // Fetch readings and facility detail (for asset names) in parallel
@@ -52,7 +51,7 @@ export function useSensorData(
       chartData: [...timeMap.values()],
       assetNames,
     };
-  }, [facilityId, metricName]);
+  };
 
   return usePolling<SensorChartData | null>(fetchFn);
 }

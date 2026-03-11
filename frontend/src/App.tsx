@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Col, Layout, Row, Spin, Typography } from "antd";
 import { fetchFacilities } from "./api/client";
 import DashboardHeader from "./components/DashboardHeader";
@@ -19,24 +19,24 @@ function App() {
   const [facilitiesError, setFacilitiesError] = useState<string | null>(null);
 
   // Load the facility list once on mount
-  const loadFacilities = useCallback(async () => {
-    try {
-      const data = await fetchFacilities();
-      setFacilities(data);
-      // Auto-select the first facility
-      if (data.length > 0) {
-        setSelectedFacilityId(data[0].id);
-      }
-    } catch (err) {
-      setFacilitiesError(
-        err instanceof Error ? err.message : "Failed to load facilities"
-      );
-    }
-  }, []);
-
   useEffect(() => {
+    const loadFacilities = async () => {
+      try {
+        const data = await fetchFacilities();
+        setFacilities(data);
+        // Auto-select the first facility
+        if (data.length > 0) {
+          setSelectedFacilityId(data[0].id);
+        }
+      } catch (err) {
+        setFacilitiesError(
+          err instanceof Error ? err.message : "Failed to load facilities"
+        );
+      }
+    };
+
     loadFacilities();
-  }, [loadFacilities]);
+  }, []);
 
   // Dashboard summary for metric cards
   const { data: summary, loading: summaryLoading, error: summaryError, lastUpdated } = useDashboard(selectedFacilityId);
@@ -74,7 +74,7 @@ function App() {
         {/* Error states */}
         {facilitiesError && (
           <Alert
-            message="Failed to load facilities"
+            title="Failed to load facilities"
             description={facilitiesError}
             type="error"
             showIcon
@@ -83,7 +83,7 @@ function App() {
         )}
         {summaryError && (
           <Alert
-            message="Failed to load dashboard data"
+            title="Failed to load dashboard data"
             description={summaryError}
             type="error"
             showIcon
@@ -92,7 +92,7 @@ function App() {
         )}
         {streamError && (
           <Alert
-            message="Stream connection error"
+            title="Stream connection error"
             description={streamError}
             type="warning"
             showIcon

@@ -3,7 +3,7 @@
  * Groups readings by timestamp with each asset as a separate key.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { fetchFacilityDetail } from "../api/client";
 import type { ChartDataPoint, MetricName, SensorReading } from "../types";
 
@@ -22,23 +22,23 @@ export function useChartData(
   );
 
   // Fetch asset names when facility changes
-  const loadAssetNames = useCallback(async () => {
-    if (!facilityId) return;
-
-    try {
-      const facility = await fetchFacilityDetail(facilityId);
-      const nameMap = new Map(
-        facility.assets.map((asset) => [asset.id, asset.name])
-      );
-      setAssetNameMap(nameMap);
-    } catch {
-      // Keep existing map on error
-    }
-  }, [facilityId]);
-
   useEffect(() => {
+    const loadAssetNames = async () => {
+      if (!facilityId) return;
+
+      try {
+        const facility = await fetchFacilityDetail(facilityId);
+        const nameMap = new Map(
+          facility.assets.map((asset) => [asset.id, asset.name])
+        );
+        setAssetNameMap(nameMap);
+      } catch {
+        // Keep existing map on error
+      }
+    };
+
     loadAssetNames();
-  }, [loadAssetNames]);
+  }, [facilityId]);
 
   // Filter readings for this metric
   const metricReadings = readings.filter((r) => r.metric_name === metricName);
