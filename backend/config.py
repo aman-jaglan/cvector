@@ -14,3 +14,10 @@ ALLOWED_ORIGINS = [
 ]
 
 API_PREFIX = "/api"
+
+# Queue configuration for real-time data streaming
+QUEUE_MAX_SIZE = 1000
+QUEUE_SPILL_THRESHOLD = 500  # Flush to DB at 50% capacity
+
+# Background data generator interval (seconds)
+DATA_GENERATOR_INTERVAL = 5
