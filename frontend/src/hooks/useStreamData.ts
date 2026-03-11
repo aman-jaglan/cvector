@@ -1,9 +1,9 @@
 /**
  * Hook for real-time sensor data streaming using pub/sub pattern.
  *
- * On mount: recovers missed data from database (since last_seen_id).
+ * On mount: recovers missed data from database (last 2 hours).
  * Then: polls the queue every second for new readings.
- * Tracks last_seen_id in localStorage to resume correctly after refresh.
+ * Tracks last_seen_id per facility in localStorage to resume correctly.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -18,13 +18,13 @@ interface UseStreamDataResult {
   lastUpdated: Date | null;
 }
 
-function getLastSeenId(): number | null {
-  const stored = localStorage.getItem(LAST_SEEN_ID_KEY);
+function getLastSeenId(facilityId: string): number | null {
+  const stored = localStorage.getItem(`${LAST_SEEN_ID_KEY}_${facilityId}`);
   return stored ? parseInt(stored, 10) : null;
 }
 
-function setLastSeenId(id: number): void {
-  localStorage.setItem(LAST_SEEN_ID_KEY, String(id));
+function setLastSeenId(facilityId: string, id: number): void {
+  localStorage.setItem(`${LAST_SEEN_ID_KEY}_${facilityId}`, String(id));
 }
 
 export function useStreamData(facilityId: string | null): UseStreamDataResult {
@@ -33,46 +33,20 @@ export function useStreamData(facilityId: string | null): UseStreamDataResult {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Track if we've done initial recovery
-  const hasRecovered = useRef(false);
+  // Store interval ID for cleanup
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Recovery: fetch missed data from database on mount
-  const recover = useCallback(async () => {
-    if (!facilityId) return;
-
-    try {
-      const lastId = getLastSeenId();
-      const recoveredReadings = await fetchRecoveryData({
-        sinceId: lastId ?? undefined,
-        facilityId,
-        windowHours: 2,
-      });
-
-      if (recoveredReadings.length > 0) {
-        // Filter to only this facility and sort by time
-        const facilityReadings = recoveredReadings
-          .filter((r) => r.facility_id === facilityId)
-          .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
-
-        setReadings(facilityReadings);
-
-        // Update last seen ID
-        const maxId = Math.max(...facilityReadings.map((r) => r.id));
-        setLastSeenId(maxId);
-      }
-
-      setLastUpdated(new Date());
-      hasRecovered.current = true;
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Recovery failed");
-    } finally {
-      setLoading(false);
+  // Cleanup function to stop polling
+  const stopPolling = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
     }
-  }, [facilityId]);
+  }, []);
 
   // Poll: fetch new readings from queue
   const poll = useCallback(async () => {
-    if (!facilityId || !hasRecovered.current) return;
+    if (!facilityId) return;
 
     try {
       const newReadings = await fetchStreamData();
@@ -96,9 +70,9 @@ export function useStreamData(facilityId: string | null): UseStreamDataResult {
             return merged;
           });
 
-          // Update last seen ID
+          // Update last seen ID for this facility
           const maxId = Math.max(...facilityReadings.map((r) => r.id));
-          setLastSeenId(maxId);
+          setLastSeenId(facilityId, maxId);
           setLastUpdated(new Date());
         }
       }
@@ -109,21 +83,56 @@ export function useStreamData(facilityId: string | null): UseStreamDataResult {
     }
   }, [facilityId]);
 
-  // Initial recovery on mount or facility change
+  // Start polling function
+  const startPolling = useCallback(() => {
+    stopPolling();
+    intervalRef.current = setInterval(poll, POLLING_INTERVAL_MS);
+  }, [poll, stopPolling]);
+
+  // Recovery and polling setup on facility change
   useEffect(() => {
-    hasRecovered.current = false;
+    if (!facilityId) return;
+
+    // Reset state for new facility
     setReadings([]);
     setLoading(true);
-    recover();
-  }, [recover]);
+    stopPolling();
 
-  // Start polling after recovery
-  useEffect(() => {
-    if (!hasRecovered.current) return;
+    // Recover historical data then start polling
+    const init = async () => {
+      try {
+        const recoveredReadings = await fetchRecoveryData({
+          facilityId,
+          windowHours: 2,
+        });
 
-    const timer = setInterval(poll, POLLING_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [poll]);
+        if (recoveredReadings.length > 0) {
+          const sortedReadings = recoveredReadings.sort((a, b) =>
+            a.recorded_at.localeCompare(b.recorded_at)
+          );
+
+          setReadings(sortedReadings);
+
+          const maxId = Math.max(...sortedReadings.map((r) => r.id));
+          setLastSeenId(facilityId, maxId);
+        }
+
+        setLastUpdated(new Date());
+        setError(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Recovery failed");
+      } finally {
+        setLoading(false);
+        // Start polling after recovery completes
+        startPolling();
+      }
+    };
+
+    init();
+
+    // Cleanup on unmount or facility change
+    return stopPolling;
+  }, [facilityId, startPolling, stopPolling]);
 
   return { readings, loading, error, lastUpdated };
 }
