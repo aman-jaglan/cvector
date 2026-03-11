@@ -63,9 +63,9 @@ async def get_dashboard_summary(
     # then sums only the most recent reading from each asset.
     async with db.execute(
         """
-        SELECT metric_name, SUM(value) as latest_value
+        SELECT metric_name, unit, SUM(value) as latest_value
         FROM (
-            SELECT metric_name, value,
+            SELECT metric_name, unit, value,
                    ROW_NUMBER() OVER (
                        PARTITION BY asset_id, metric_name
                        ORDER BY recorded_at DESC
@@ -74,13 +74,13 @@ async def get_dashboard_summary(
             WHERE facility_id = ?
         )
         WHERE row_num = 1
-        GROUP BY metric_name
+        GROUP BY metric_name, unit
         """,
         (facility_id,),
     ) as cursor:
         latest_rows = await cursor.fetchall()
 
-    latest_map = {row["metric_name"]: row["latest_value"] for row in latest_rows}
+    latest_map = {(row["metric_name"], row["unit"]): row["latest_value"] for row in latest_rows}
 
     # Combine aggregated stats with latest values
     metrics = []
@@ -89,7 +89,7 @@ async def get_dashboard_summary(
         metrics.append(
             MetricSummary(
                 metric_name=metric_name,
-                latest_value=round(latest_map.get(metric_name, row["average_value"]), 2),
+                latest_value=round(latest_map.get((metric_name, row["unit"]), row["average_value"]), 2),
                 average_value=round(row["average_value"], 2),
                 min_value=round(row["min_value"], 2),
                 max_value=round(row["max_value"], 2),
