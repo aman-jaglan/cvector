@@ -1,9 +1,9 @@
 """In-memory sensor reading queue for real-time data streaming.
 
-Implements a pub/sub pattern where the background generator publishes
-readings to the queue, and the dashboard subscribes by polling. When
-the queue reaches 50% capacity, readings are spilled to the database
-to prevent data loss.
+Implements a producer-consumer pattern where the background generator
+produces readings to the queue, and the dashboard consumes by polling.
+When the queue reaches 50% capacity, readings are spilled to the
+database to prevent data loss.
 """
 
 from collections import deque

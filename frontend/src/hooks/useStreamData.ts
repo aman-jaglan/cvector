@@ -1,5 +1,5 @@
 /**
- * Hook for real-time sensor data streaming using pub/sub pattern.
+ * Hook for real-time sensor data streaming.
  *
  * On mount: recovers missed data from database (last 2 hours).
  * Then: polls the queue every second for new readings.
