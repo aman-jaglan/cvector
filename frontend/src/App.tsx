@@ -7,6 +7,7 @@ import MetricCards from "./components/MetricCards";
 import PowerConsumptionChart from "./components/PowerConsumptionChart";
 import TemperatureChart from "./components/TemperatureChart";
 import { useDashboard } from "./hooks/useDashboard";
+import { useStreamData } from "./hooks/useStreamData";
 import type { Facility } from "./types";
 
 const { Content } = Layout;
@@ -37,7 +38,15 @@ function App() {
     loadFacilities();
   }, [loadFacilities]);
 
-  const { data: summary, loading, error, lastUpdated } = useDashboard(selectedFacilityId);
+  // Dashboard summary for metric cards
+  const { data: summary, loading: summaryLoading, error: summaryError, lastUpdated } = useDashboard(selectedFacilityId);
+
+  // Real-time stream data for charts
+  const {
+    readings: streamReadings,
+    loading: streamLoading,
+    error: streamError,
+  } = useStreamData(selectedFacilityId);
 
   return (
     <Layout style={{ minHeight: "100vh", background: "#fff" }}>
@@ -72,18 +81,27 @@ function App() {
             style={{ marginBottom: 16 }}
           />
         )}
-        {error && (
+        {summaryError && (
           <Alert
             message="Failed to load dashboard data"
-            description={error}
+            description={summaryError}
             type="error"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        {streamError && (
+          <Alert
+            message="Stream connection error"
+            description={streamError}
+            type="warning"
             showIcon
             style={{ marginBottom: 16 }}
           />
         )}
 
         {/* Loading state */}
-        {loading && !summary && (
+        {summaryLoading && !summary && (
           <div style={{ textAlign: "center", padding: 80 }}>
             <Spin size="large" />
           </div>
@@ -96,10 +114,18 @@ function App() {
 
             <Row gutter={[16, 16]}>
               <Col xs={24} xl={12}>
-                <PowerConsumptionChart facilityId={selectedFacilityId} />
+                <PowerConsumptionChart
+                  facilityId={selectedFacilityId}
+                  readings={streamReadings}
+                  loading={streamLoading}
+                />
               </Col>
               <Col xs={24} xl={12}>
-                <TemperatureChart facilityId={selectedFacilityId} />
+                <TemperatureChart
+                  facilityId={selectedFacilityId}
+                  readings={streamReadings}
+                  loading={streamLoading}
+                />
               </Col>
             </Row>
           </>
