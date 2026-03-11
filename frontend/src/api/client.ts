@@ -49,3 +49,40 @@ export function fetchDashboardSummary(
     `${API_BASE_URL}/dashboard/summary/${facilityId}`
   );
 }
+
+/**
+ * Poll the stream endpoint for new readings from the queue.
+ * Returns readings that have been generated since the last poll.
+ */
+export function fetchStreamData(): Promise<SensorReading[]> {
+  return fetchJson<SensorReading[]>(`${API_BASE_URL}/stream`);
+}
+
+/**
+ * Recover missed readings from the database.
+ * Used when dashboard reconnects after being offline.
+ */
+export function fetchRecoveryData(params: {
+  sinceId?: number;
+  facilityId?: string;
+  windowHours?: number;
+}): Promise<SensorReading[]> {
+  const searchParams = new URLSearchParams();
+
+  if (params.sinceId !== undefined) {
+    searchParams.set("since_id", String(params.sinceId));
+  }
+  if (params.facilityId) {
+    searchParams.set("facility_id", params.facilityId);
+  }
+  if (params.windowHours) {
+    searchParams.set("window_hours", String(params.windowHours));
+  }
+
+  const query = searchParams.toString();
+  const url = query
+    ? `${API_BASE_URL}/stream/recovery?${query}`
+    : `${API_BASE_URL}/stream/recovery`;
+
+  return fetchJson<SensorReading[]>(url);
+}
