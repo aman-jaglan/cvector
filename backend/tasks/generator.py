@@ -50,16 +50,42 @@ METRIC_PROFILES = {
 
 
 def generate_sensor_value(baseline: float, amplitude: float) -> float:
-    """Generate a realistic sensor value with random variation.
+    """Generate a realistic sensor value with spikes, drift, and variation.
 
-    Uses a combination of sine wave (for gradual drift) and random noise
-    to simulate real equipment behavior.
+    Simulates real industrial equipment behavior:
+    - Gradual sine wave drift over time
+    - Random noise for natural variation
+    - Occasional spikes (5% chance) for sudden load changes
+    - Rare anomalies (2% chance) for equipment stress events
     """
     time_factor = datetime.utcnow().timestamp()
-    phase = (time_factor % 3600) / 3600 * 2 * math.pi
-    sine_component = amplitude * math.sin(phase)
-    noise = random.gauss(0, amplitude * 0.15)
-    return round(baseline + sine_component + noise, 2)
+
+    # Primary sine wave (1-hour cycle)
+    phase1 = (time_factor % 3600) / 3600 * 2 * math.pi
+    sine1 = amplitude * math.sin(phase1)
+
+    # Secondary faster sine wave (10-minute cycle) for more variation
+    phase2 = (time_factor % 600) / 600 * 2 * math.pi
+    sine2 = amplitude * 0.3 * math.sin(phase2)
+
+    # Random noise
+    noise = random.gauss(0, amplitude * 0.2)
+
+    # Start with base value
+    value = baseline + sine1 + sine2 + noise
+
+    # 5% chance of a spike (sudden load change)
+    if random.random() < 0.05:
+        spike_direction = random.choice([-1, 1])
+        spike_magnitude = amplitude * random.uniform(0.5, 1.5)
+        value += spike_direction * spike_magnitude
+
+    # 2% chance of an anomaly (equipment stress)
+    if random.random() < 0.02:
+        anomaly_factor = random.uniform(0.85, 1.15)
+        value *= anomaly_factor
+
+    return round(value, 2)
 
 
 async def generate_readings_for_assets(db: aiosqlite.Connection) -> list[dict]:
